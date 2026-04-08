@@ -281,85 +281,119 @@ function drawChameleon(ctx, x, y, facing, walkPhase, alpha) {
   ctx.scale(facing, 1);
   ctx.globalAlpha = alpha;
 
-  const bob = Math.sin(walkPhase) * 3;
+  const bob = Math.sin(walkPhase) * 2;
   ctx.translate(0, bob);
 
-  const C = '#1e1e1e';
+  const C = '#1a1a1a';
 
-  // tail (curly, behind body)
+  // ─── Back curly tail ─────────────────────────────────────────
+  // Tail coils back behind the body with double spiral
+  // Lower coil
   ctx.beginPath();
-  ctx.moveTo(-32, 4);
-  ctx.bezierCurveTo(-52, 0, -64, 18, -58, 30);
-  ctx.bezierCurveTo(-52, 42, -40, 36, -44, 24);
-  ctx.bezierCurveTo(-46, 16, -54, 20, -52, 28);
-  ctx.strokeStyle = C; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.arc(-48, 18, 16, -0.2, Math.PI * 1.3, true);
+  ctx.strokeStyle = C; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.stroke();
+  // Upper coil at tip
+  ctx.beginPath();
+  ctx.arc(-62, 0, 12, 1.2, Math.PI * 1.8, true);
   ctx.stroke();
 
-  // back legs
-  ctx.strokeStyle = C; ctx.lineWidth = 7; ctx.lineCap = 'round';
-  const backLegSwing = Math.sin(walkPhase) * 8;
+  // ─── Body (segmented organic shape) ──────────────────────────
+  // Main body ellipse
   ctx.beginPath();
-  ctx.moveTo(-18, 12); ctx.lineTo(-22 + backLegSwing, 36); ctx.lineTo(-30 + backLegSwing, 44);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-18, 12); ctx.lineTo(-12 - backLegSwing, 36); ctx.lineTo(-6 - backLegSwing, 44);
-  ctx.stroke();
-
-  // body
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 38, 20, 0.1, 0, Math.PI * 2);
+  ctx.ellipse(-8, 0, 42, 18, 0, 0, Math.PI * 2);
   ctx.fillStyle = C; ctx.fill();
 
-  // dorsal crest spines
+  // Segmented ridges on back (overlapping circles for texture)
   ctx.fillStyle = C;
-  for (let i = -3; i <= 3; i++) {
+  for (let i = 0; i < 6; i++) {
+    const bx = -30 + i * 12;
     ctx.beginPath();
-    ctx.moveTo(i * 9 - 2, -18); ctx.lineTo(i * 9 - 6, -30); ctx.lineTo(i * 9 + 2, -30);
-    ctx.closePath(); ctx.fill();
+    ctx.arc(bx, -17, 8, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // front legs
-  const frontLegSwing = -Math.sin(walkPhase) * 8;
-  ctx.strokeStyle = C; ctx.lineWidth = 7;
+  // ─── Four legs with knee joints ──────────────────────────────
+  const legSwing = Math.sin(walkPhase) * 6;
+
+  // Back left leg
+  ctx.strokeStyle = C; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.moveTo(18, 10); ctx.lineTo(22 + frontLegSwing, 34); ctx.lineTo(30 + frontLegSwing, 42);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(18, 10); ctx.lineTo(12 - frontLegSwing, 34); ctx.lineTo(6 - frontLegSwing, 42);
+  ctx.moveTo(-24, 14);
+  ctx.lineTo(-30 + legSwing, 32);
+  ctx.lineTo(-34 + legSwing * 1.2, 46);
   ctx.stroke();
 
-  // neck
+  // Back right leg
   ctx.beginPath();
-  ctx.ellipse(36, -8, 12, 9, 0.4, 0, Math.PI * 2);
+  ctx.moveTo(-24, -14);
+  ctx.lineTo(-30 + legSwing, -32);
+  ctx.lineTo(-34 + legSwing * 1.2, -46);
+  ctx.stroke();
+
+  // Front left leg
+  const flegSwing = -Math.sin(walkPhase) * 6;
+  ctx.beginPath();
+  ctx.moveTo(20, 14);
+  ctx.lineTo(28 + flegSwing, 32);
+  ctx.lineTo(34 + flegSwing * 1.2, 46);
+  ctx.stroke();
+
+  // Front right leg
+  ctx.beginPath();
+  ctx.moveTo(20, -14);
+  ctx.lineTo(28 + flegSwing, -32);
+  ctx.lineTo(34 + flegSwing * 1.2, -46);
+  ctx.stroke();
+
+  // ─── Head (rounded, compact) ─────────────────────────────────
+  // Back of head
+  ctx.beginPath();
+  ctx.ellipse(44, 0, 20, 22, 0, 0, Math.PI * 2);
   ctx.fillStyle = C; ctx.fill();
 
-  // head (casque)
+  // Head bump/casque (top of head)
   ctx.beginPath();
-  ctx.moveTo(26, -10);
-  ctx.bezierCurveTo(34, -28, 58, -24, 62, -10);
-  ctx.bezierCurveTo(66, 2, 52, 8, 36, 6);
-  ctx.closePath();
-  ctx.fillStyle = C; ctx.fill();
+  ctx.ellipse(46, -18, 14, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
 
-  // casque ridge
+  // Snout/jaw area (forward part of head)
   ctx.beginPath();
-  ctx.moveTo(38, -28); ctx.lineTo(58, -24);
-  ctx.strokeStyle = C; ctx.lineWidth = 4; ctx.stroke();
+  ctx.ellipse(62, 2, 16, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
 
-  // eye ring (light)
+  // Mouth line
   ctx.beginPath();
-  ctx.arc(50, -10, 10, 0, Math.PI * 2);
-  ctx.fillStyle = '#3a3a3a'; ctx.fill();
-  // eye
+  ctx.moveTo(62, 10);
+  ctx.lineTo(70, 14);
+  ctx.strokeStyle = C; ctx.lineWidth = 2; ctx.stroke();
+
+  // ─── Eyes (two prominent forward-facing) ─────────────────────
+  // Left eye
   ctx.beginPath();
-  ctx.arc(52, -10, 6, 0, Math.PI * 2);
-  ctx.fillStyle = '#f0e040'; ctx.fill();
-  ctx.beginPath();
-  ctx.arc(53, -10, 3.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#1a1a1a'; ctx.fill();
-  ctx.beginPath();
-  ctx.arc(54, -11, 1.2, 0, Math.PI * 2);
+  ctx.arc(54, -6, 8, 0, Math.PI * 2);
   ctx.fillStyle = 'white'; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(54, -6, 5, 0, Math.PI * 2);
+  ctx.fillStyle = C; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(55.5, -7, 2, 0, Math.PI * 2);
+  ctx.fillStyle = 'white'; ctx.fill();
+
+  // Right eye
+  ctx.beginPath();
+  ctx.arc(54, 6, 8, 0, Math.PI * 2);
+  ctx.fillStyle = 'white'; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(54, 6, 5, 0, Math.PI * 2);
+  ctx.fillStyle = C; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(55.5, 5, 2, 0, Math.PI * 2);
+  ctx.fillStyle = 'white'; ctx.fill();
+
+  // ─── Front curly tail (forward coil) ─────────────────────────
+  ctx.beginPath();
+  ctx.arc(78, -4, 14, 0.3, Math.PI * 1.1, false);
+  ctx.strokeStyle = C; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.stroke();
 
   ctx.restore();
 }
