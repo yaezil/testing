@@ -286,114 +286,105 @@ function drawChameleon(ctx, x, y, facing, walkPhase, alpha) {
 
   const C = '#1a1a1a';
 
-  // ─── Back curly tail ─────────────────────────────────────────
-  // Tail coils back behind the body with double spiral
-  // Lower coil
+  // ─── Massive spiral tail (LEFT/BOTTOM) ───────────────────────
+  // This is the dominant visual element - curves down and spirals back
+  // Outer spiral line
   ctx.beginPath();
-  ctx.arc(-48, 18, 16, -0.2, Math.PI * 1.3, true);
-  ctx.strokeStyle = C; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.stroke();
-  // Upper coil at tip
+  ctx.moveTo(-8, 12);
+  ctx.bezierCurveTo(-20, 25, -28, 28, -24, 42);
+  ctx.bezierCurveTo(-18, 52, -8, 50, -4, 38);
+  ctx.strokeStyle = C; ctx.lineWidth = 11; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+
+  // Inner spiral coil
   ctx.beginPath();
-  ctx.arc(-62, 0, 12, 1.2, Math.PI * 1.8, true);
+  ctx.moveTo(-12, 18);
+  ctx.bezierCurveTo(-18, 28, -22, 32, -18, 44);
+  ctx.bezierCurveTo(-14, 52, -6, 50, -2, 40);
   ctx.stroke();
 
-  // ─── Body (segmented organic shape) ──────────────────────────
-  // Main body ellipse
-  ctx.beginPath();
-  ctx.ellipse(-8, 0, 42, 18, 0, 0, Math.PI * 2);
-  ctx.fillStyle = C; ctx.fill();
-
-  // Segmented ridges on back (overlapping circles for texture)
-  ctx.fillStyle = C;
-  for (let i = 0; i < 6; i++) {
-    const bx = -30 + i * 12;
-    ctx.beginPath();
-    ctx.arc(bx, -17, 8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ─── Four legs with knee joints ──────────────────────────────
-  const legSwing = Math.sin(walkPhase) * 6;
-
-  // Back left leg
-  ctx.strokeStyle = C; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-24, 14);
-  ctx.lineTo(-30 + legSwing, 32);
-  ctx.lineTo(-34 + legSwing * 1.2, 46);
-  ctx.stroke();
-
-  // Back right leg
-  ctx.beginPath();
-  ctx.moveTo(-24, -14);
-  ctx.lineTo(-30 + legSwing, -32);
-  ctx.lineTo(-34 + legSwing * 1.2, -46);
-  ctx.stroke();
-
-  // Front left leg
-  const flegSwing = -Math.sin(walkPhase) * 6;
+  // ─── Body (curves from back to head) ─────────────────────────
   ctx.beginPath();
   ctx.moveTo(20, 14);
-  ctx.lineTo(28 + flegSwing, 32);
-  ctx.lineTo(34 + flegSwing * 1.2, 46);
+  ctx.bezierCurveTo(10, 20, 0, 18, -8, 12);
+  ctx.bezierCurveTo(-12, 8, -8, -8, 8, -12);
+  ctx.bezierCurveTo(30, -14, 50, -8, 58, 0);
+  ctx.closePath();
+  ctx.fillStyle = C; ctx.fill();
+
+  // ─── Back segmentation/ridges ───────────────────────────────
+  // Bumpy ridge texture along the back
+  ctx.fillStyle = C;
+  const ridgePoints = [
+    {x: 8, y: -16}, {x: 18, y: -18}, {x: 28, y: -16},
+    {x: 38, y: -14}, {x: 48, y: -10}, {x: 55, y: -8}
+  ];
+  ridgePoints.forEach(pt => {
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // ─── Four legs ──────────────────────────────────────────────
+  ctx.strokeStyle = C; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  const legSwing = Math.sin(walkPhase) * 4;
+  const flegSwing = -Math.sin(walkPhase) * 4;
+
+  // Front-left leg (under head area)
+  ctx.beginPath();
+  ctx.moveTo(40, 8);
+  ctx.lineTo(42 + flegSwing, 24);
+  ctx.lineTo(40 + flegSwing * 1.3, 36);
   ctx.stroke();
 
-  // Front right leg
+  // Front-right leg
   ctx.beginPath();
-  ctx.moveTo(20, -14);
-  ctx.lineTo(28 + flegSwing, -32);
-  ctx.lineTo(34 + flegSwing * 1.2, -46);
+  ctx.moveTo(40, -8);
+  ctx.lineTo(42 + flegSwing, -24);
+  ctx.lineTo(40 + flegSwing * 1.3, -36);
   ctx.stroke();
 
-  // ─── Head (rounded, compact) ─────────────────────────────────
-  // Back of head
+  // Back-left leg (mid body)
   ctx.beginPath();
-  ctx.ellipse(44, 0, 20, 22, 0, 0, Math.PI * 2);
+  ctx.moveTo(10, 12);
+  ctx.lineTo(8 + legSwing, 28);
+  ctx.lineTo(4 + legSwing * 1.3, 40);
+  ctx.stroke();
+
+  // Back-right leg
+  ctx.beginPath();
+  ctx.moveTo(10, -12);
+  ctx.lineTo(8 + legSwing, -28);
+  ctx.lineTo(4 + legSwing * 1.3, -40);
+  ctx.stroke();
+
+  // ─── Head (RIGHT side, rounded/bulbous) ──────────────────────
+  // Main head shape
+  ctx.beginPath();
+  ctx.moveTo(50, -6);
+  ctx.bezierCurveTo(62, -12, 72, -10, 74, 2);
+  ctx.bezierCurveTo(76, 12, 68, 16, 58, 10);
+  ctx.bezierCurveTo(52, 6, 50, 2, 50, -6);
+  ctx.closePath();
   ctx.fillStyle = C; ctx.fill();
 
-  // Head bump/casque (top of head)
+  // Head ridge/bump on top
   ctx.beginPath();
-  ctx.ellipse(46, -18, 14, 10, 0, 0, Math.PI * 2);
+  ctx.arc(62, -10, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(68, -8, 7, 0, Math.PI * 2);
   ctx.fill();
 
-  // Snout/jaw area (forward part of head)
+  // Eye ridge (upper part of head)
   ctx.beginPath();
-  ctx.ellipse(62, 2, 16, 14, 0, 0, Math.PI * 2);
+  ctx.arc(56, -6, 5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Mouth line
+  // Mouth/jaw area
   ctx.beginPath();
-  ctx.moveTo(62, 10);
-  ctx.lineTo(70, 14);
-  ctx.strokeStyle = C; ctx.lineWidth = 2; ctx.stroke();
-
-  // ─── Eyes (two prominent forward-facing) ─────────────────────
-  // Left eye
-  ctx.beginPath();
-  ctx.arc(54, -6, 8, 0, Math.PI * 2);
-  ctx.fillStyle = 'white'; ctx.fill();
-  ctx.beginPath();
-  ctx.arc(54, -6, 5, 0, Math.PI * 2);
-  ctx.fillStyle = C; ctx.fill();
-  ctx.beginPath();
-  ctx.arc(55.5, -7, 2, 0, Math.PI * 2);
-  ctx.fillStyle = 'white'; ctx.fill();
-
-  // Right eye
-  ctx.beginPath();
-  ctx.arc(54, 6, 8, 0, Math.PI * 2);
-  ctx.fillStyle = 'white'; ctx.fill();
-  ctx.beginPath();
-  ctx.arc(54, 6, 5, 0, Math.PI * 2);
-  ctx.fillStyle = C; ctx.fill();
-  ctx.beginPath();
-  ctx.arc(55.5, 5, 2, 0, Math.PI * 2);
-  ctx.fillStyle = 'white'; ctx.fill();
-
-  // ─── Front curly tail (forward coil) ─────────────────────────
-  ctx.beginPath();
-  ctx.arc(78, -4, 14, 0.3, Math.PI * 1.1, false);
-  ctx.strokeStyle = C; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.arc(72, 4, 6, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }
