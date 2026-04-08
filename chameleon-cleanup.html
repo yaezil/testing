@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chameleon Nature Cleanup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #f0ede8; font-family: sans-serif; }
+  canvas { display: block; }
+  #restart {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+    background: #5a8a4a; color: white; border: none; border-radius: 24px;
+    padding: 12px 32px; font-size: 16px; cursor: pointer; opacity: 0;
+    transition: opacity 0.5s; pointer-events: none;
+  }
+  #restart.visible { opacity: 1; pointer-events: auto; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<button id="restart">Play Again</button>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W = canvas.width = window.innerWidth;
+let H = canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+});
+
+// ─── Element draw functions (matching Figma illustration style) ───────────────
+
+function drawRedFlower(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // stem
+  ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(-4, 60);
+  ctx.strokeStyle = '#4a7c59'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
+  // leaf
+  ctx.beginPath(); ctx.ellipse(-14, 38, 14, 7, -0.6, 0, Math.PI * 2);
+  ctx.fillStyle = '#4a7c59'; ctx.fill();
+  // petals
+  ctx.fillStyle = '#e05252';
+  for (let i = 0; i < 5; i++) {
+    ctx.save(); ctx.translate(0, -20); ctx.rotate((i / 5) * Math.PI * 2);
+    ctx.beginPath(); ctx.ellipse(0, -20, 13, 19, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.restore();
+  }
+  // center
+  ctx.beginPath(); ctx.arc(0, -20, 12, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a1a'; ctx.fill();
+  ctx.restore();
+}
+
+function drawPinkTulip(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // curvy stem
+  ctx.beginPath(); ctx.moveTo(0, 10);
+  ctx.bezierCurveTo(-12, 25, 18, 42, 8, 62);
+  ctx.strokeStyle = '#c4d44e'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
+  // petals
+  ctx.fillStyle = '#e668a0';
+  ctx.beginPath(); ctx.ellipse(-12, -18, 11, 24, -0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(12, -18, 11, 24, 0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -22, 11, 24, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawYellowFlower(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // stem (slight offset)
+  ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(-4, 62);
+  ctx.strokeStyle = '#3d7a50'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
+  // wavy petals
+  ctx.fillStyle = '#f5a623';
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * 20, -28 + Math.sin(a) * 20, 11, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(0, -28, 16, 0, Math.PI * 2); ctx.fill();
+  // center
+  ctx.beginPath(); ctx.arc(0, -28, 9, 0, Math.PI * 2);
+  ctx.fillStyle = '#c0392b'; ctx.fill();
+  ctx.beginPath(); ctx.arc(-2, -30, 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a1a'; ctx.fill();
+  ctx.restore();
+}
+
+function drawBlueFlower(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // stem with leaf
+  ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(0, 55);
+  ctx.strokeStyle = '#5caa7a'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(18, 35, 16, 8, 0.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#5caa7a'; ctx.fill();
+  // round head
+  ctx.beginPath(); ctx.arc(0, -22, 24, 0, Math.PI * 2);
+  ctx.fillStyle = '#6b7fd4'; ctx.fill();
+  // white dots
+  ctx.fillStyle = 'white';
+  [[-9,-28],[6,-31],[14,-20],[-4,-14],[9,-11],[-14,-18]].forEach(([dx,dy]) => {
+    ctx.beginPath(); ctx.arc(dx, dy, 4.5, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawVine(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath();
+  ctx.moveTo(0, 45); ctx.bezierCurveTo(8, 15, -6, -8, 4, -45);
+  ctx.strokeStyle = '#c4d44e'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.fillStyle = '#2d5a3d';
+  [-40, -24, -8, 8, 26].forEach(sy => {
+    ctx.beginPath(); ctx.arc(4, sy, 7, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawFern(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.moveTo(0, 50); ctx.lineTo(0, -50);
+  ctx.strokeStyle = '#2d5a3d'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#2d5a3d';
+  for (let i = -5; i <= 5; i++) {
+    const ly = i * 10, lw = 20 - Math.abs(i) * 1.8;
+    ctx.beginPath(); ctx.ellipse(-lw / 2 - 4, ly, lw / 2, 5.5, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(lw / 2 + 4, ly, lw / 2, 5.5, 0.2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawMoss(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // mossy rock shape
+  ctx.beginPath();
+  ctx.moveTo(-22, 40); ctx.bezierCurveTo(-28, 0, -20, -40, -4, -50);
+  ctx.bezierCurveTo(10, -58, 22, -30, 24, 10);
+  ctx.bezierCurveTo(26, 40, 10, 50, -22, 40);
+  ctx.fillStyle = '#4a8a6a'; ctx.fill();
+  // pink spots
+  ctx.fillStyle = '#e8707a';
+  [[-10, -20], [8, -30], [14, 0], [-4, 10], [10, 25], [-8, -5]].forEach(([dx, dy]) => {
+    ctx.beginPath(); ctx.ellipse(dx, dy, 6, 5, 0.3, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawBee(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // wings
+  ctx.fillStyle = 'rgba(180, 220, 240, 0.75)';
+  ctx.beginPath(); ctx.ellipse(-10, -14, 12, 7, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(10, -14, 12, 7, 0.4, 0, Math.PI * 2); ctx.fill();
+  // body
+  ctx.beginPath(); ctx.ellipse(0, 0, 13, 17, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#f5c518'; ctx.fill();
+  // stripes
+  ctx.fillStyle = '#2d2d2d';
+  [-9, -2, 5].forEach(sy => {
+    ctx.beginPath(); ctx.ellipse(0, sy, 11, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  });
+  // antennae
+  ctx.strokeStyle = '#2d2d2d'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+  [[-5, -14, -11, -23], [5, -14, 11, -23]].forEach(([x1, y1, x2, y2]) => {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x2, y2, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#f5c518'; ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawButterfly(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = '#e879b0';
+  ctx.beginPath(); ctx.ellipse(-17, -11, 19, 14, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(17, -11, 19, 14, 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#c469d4';
+  ctx.beginPath(); ctx.ellipse(-14, 9, 14, 10, 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(14, 9, 14, 10, -0.4, 0, Math.PI * 2); ctx.fill();
+  // body
+  ctx.beginPath(); ctx.ellipse(0, 0, 4, 15, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#2d2d2d'; ctx.fill();
+  ctx.restore();
+}
+
+function drawWater(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2);
+  ctx.fillStyle = '#82c4e8'; ctx.fill();
+  ctx.beginPath(); ctx.arc(-5, -5, 6, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fill();
+  ctx.restore();
+}
+
+function drawSun(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = '#f0943a'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 18, Math.sin(a) * 18);
+    ctx.lineTo(Math.cos(a) * 28, Math.sin(a) * 28);
+    ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2);
+  ctx.fillStyle = '#f0943a'; ctx.fill();
+  ctx.restore();
+}
+
+function drawDandelionSeed(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.ellipse(0, 10, 3.5, 6, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#8b7355'; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0, 4); ctx.lineTo(0, -12);
+  ctx.strokeStyle = '#8b7355'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.strokeStyle = 'rgba(210,210,210,0.9)'; ctx.lineWidth = 1;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(0, -12);
+    ctx.lineTo(Math.cos(a) * 13, -12 + Math.sin(a) * 13); ctx.stroke();
+    ctx.beginPath(); ctx.arc(Math.cos(a) * 13, -12 + Math.sin(a) * 13, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(235,235,235,0.95)'; ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSeed(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.ellipse(0, 0, 9, 14, 0.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#8eba5a'; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0, -13); ctx.lineTo(0, 13);
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.restore();
+}
+
+function drawBean(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.ellipse(0, 0, 18, 11, 0.25, 0, Math.PI * 2);
+  ctx.fillStyle = '#8b2020'; ctx.fill();
+  ctx.restore();
+}
+
+function drawAcorn(ctx, x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // cap
+  ctx.beginPath(); ctx.ellipse(0, -10, 15, 9, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#6b4226'; ctx.fill();
+  ctx.strokeStyle = '#5a3820'; ctx.lineWidth = 1.2;
+  for (let i = -10; i <= 10; i += 5) {
+    ctx.beginPath(); ctx.moveTo(i, -16); ctx.lineTo(i, -3); ctx.stroke();
+  }
+  // stem
+  ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, -24);
+  ctx.strokeStyle = '#6b4226'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke();
+  // body
+  ctx.beginPath(); ctx.ellipse(0, 6, 13, 16, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#c8853a'; ctx.fill();
+  ctx.restore();
+}
+
+const DRAW_FNS = {
+  flower_red: drawRedFlower, flower_pink: drawPinkTulip,
+  flower_yellow: drawYellowFlower, flower_blue: drawBlueFlower,
+  vine: drawVine, fern: drawFern, moss: drawMoss,
+  bee: drawBee, butterfly: drawButterfly,
+  water: drawWater, sun: drawSun,
+  dandelion: drawDandelionSeed, seed: drawSeed,
+  bean: drawBean, acorn: drawAcorn
+};
+const TYPES = Object.keys(DRAW_FNS);
+
+// ─── Chameleon silhouette ─────────────────────────────────────────────────────
+
+function drawChameleon(ctx, x, y, facing, walkPhase, alpha) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(facing, 1);
+  ctx.globalAlpha = alpha;
+
+  const bob = Math.sin(walkPhase) * 3;
+  ctx.translate(0, bob);
+
+  const C = '#1e1e1e';
+
+  // tail (curly, behind body)
+  ctx.beginPath();
+  ctx.moveTo(-32, 4);
+  ctx.bezierCurveTo(-52, 0, -64, 18, -58, 30);
+  ctx.bezierCurveTo(-52, 42, -40, 36, -44, 24);
+  ctx.bezierCurveTo(-46, 16, -54, 20, -52, 28);
+  ctx.strokeStyle = C; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // back legs
+  ctx.strokeStyle = C; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  const backLegSwing = Math.sin(walkPhase) * 8;
+  ctx.beginPath();
+  ctx.moveTo(-18, 12); ctx.lineTo(-22 + backLegSwing, 36); ctx.lineTo(-30 + backLegSwing, 44);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-18, 12); ctx.lineTo(-12 - backLegSwing, 36); ctx.lineTo(-6 - backLegSwing, 44);
+  ctx.stroke();
+
+  // body
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 38, 20, 0.1, 0, Math.PI * 2);
+  ctx.fillStyle = C; ctx.fill();
+
+  // dorsal crest spines
+  ctx.fillStyle = C;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * 9 - 2, -18); ctx.lineTo(i * 9 - 6, -30); ctx.lineTo(i * 9 + 2, -30);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // front legs
+  const frontLegSwing = -Math.sin(walkPhase) * 8;
+  ctx.strokeStyle = C; ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.moveTo(18, 10); ctx.lineTo(22 + frontLegSwing, 34); ctx.lineTo(30 + frontLegSwing, 42);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(18, 10); ctx.lineTo(12 - frontLegSwing, 34); ctx.lineTo(6 - frontLegSwing, 42);
+  ctx.stroke();
+
+  // neck
+  ctx.beginPath();
+  ctx.ellipse(36, -8, 12, 9, 0.4, 0, Math.PI * 2);
+  ctx.fillStyle = C; ctx.fill();
+
+  // head (casque)
+  ctx.beginPath();
+  ctx.moveTo(26, -10);
+  ctx.bezierCurveTo(34, -28, 58, -24, 62, -10);
+  ctx.bezierCurveTo(66, 2, 52, 8, 36, 6);
+  ctx.closePath();
+  ctx.fillStyle = C; ctx.fill();
+
+  // casque ridge
+  ctx.beginPath();
+  ctx.moveTo(38, -28); ctx.lineTo(58, -24);
+  ctx.strokeStyle = C; ctx.lineWidth = 4; ctx.stroke();
+
+  // eye ring (light)
+  ctx.beginPath();
+  ctx.arc(50, -10, 10, 0, Math.PI * 2);
+  ctx.fillStyle = '#3a3a3a'; ctx.fill();
+  // eye
+  ctx.beginPath();
+  ctx.arc(52, -10, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#f0e040'; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(53, -10, 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a1a'; ctx.fill();
+  ctx.beginPath();
+  ctx.arc(54, -11, 1.2, 0, Math.PI * 2);
+  ctx.fillStyle = 'white'; ctx.fill();
+
+  ctx.restore();
+}
+
+// ─── Tongue ───────────────────────────────────────────────────────────────────
+
+function drawTongue(ctx, cham, tongue) {
+  if (!tongue.active || tongue.progress <= 0) return;
+  const hx = cham.x + cham.facing * 62;
+  const hy = cham.y - 10;
+  const ex = hx + tongue.dx * tongue.progress;
+  const ey = hy + tongue.dy * tongue.progress;
+
+  ctx.save();
+  // sticky tongue
+  ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(ex, ey);
+  ctx.strokeStyle = '#d04040'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.stroke();
+  // tip bulge
+  ctx.beginPath(); ctx.arc(ex, ey, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#b03030'; ctx.fill();
+  ctx.restore();
+}
+
+// ─── Clumps ───────────────────────────────────────────────────────────────────
+
+let clumps = [];
+
+function initClumps() {
+  clumps = [];
+  const NUM = Math.floor(W * H / 28000) + 10;
+  for (let i = 0; i < NUM; i++) {
+    const x = 130 + Math.random() * (W - 260);
+    const y = 130 + Math.random() * (H - 260);
+    const count = 3 + Math.floor(Math.random() * 4);
+    const elements = Array.from({ length: count }, () => ({
+      type: TYPES[Math.floor(Math.random() * TYPES.length)],
+      ox: (Math.random() - 0.5) * 100,
+      oy: (Math.random() - 0.5) * 100,
+      scale: 0.45 + Math.random() * 0.5,
+      rot: (Math.random() - 0.5) * 0.6
+    }));
+    clumps.push({ x, y, elements, alive: true, opacity: 1 });
+  }
+}
+
+// ─── Particles ────────────────────────────────────────────────────────────────
+
+let particles = [];
+
+function spawnParticles(x, y) {
+  const colors = ['#e05252','#f5a623','#e668a0','#6b7fd4','#5caa7a','#f5c518','#c469d4'];
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const spd = 1.5 + Math.random() * 3.5;
+    particles.push({
+      x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd - 1,
+      life: 1, color: colors[Math.floor(Math.random() * colors.length)],
+      size: 5 + Math.random() * 7
+    });
+  }
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let cham = {
+  x: -200, y: H / 2, facing: 1,
+  state: 'idle', // idle | entering | seeking | licking | exiting
+  target: null, speed: 1.6,
+  exitPt: null, walkPhase: 0, alpha: 1
+};
+
+let tongue = {
+  active: false, progress: 0, phase: 'extend',
+  dx: 0, dy: 0
+};
+
+let gameComplete = false;
+let completeAlpha = 0;
+let chamSpawnDelay = 0.5;
+
+function getAliveClumps() { return clumps.filter(c => c.alive); }
+
+function getNearestClump() {
+  let best = null, bestD = Infinity;
+  for (const c of clumps) {
+    if (!c.alive) continue;
+    const d = Math.hypot(c.x - cham.x, c.y - cham.y);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
+function randomEdgePoint() {
+  const edge = Math.floor(Math.random() * 4);
+  switch (edge) {
+    case 0: return { x: 150 + Math.random() * (W - 300), y: -120, edge };
+    case 1: return { x: 150 + Math.random() * (W - 300), y: H + 120, edge };
+    case 2: return { x: -160, y: 120 + Math.random() * (H - 240), edge };
+    default: return { x: W + 160, y: 120 + Math.random() * (H - 240), edge };
+  }
+}
+
+function spawnChameleon() {
+  const pt = randomEdgePoint();
+  cham.x = pt.x; cham.y = pt.y;
+  cham.facing = pt.x < W / 2 ? 1 : -1;
+  // Aim toward center initially
+  const dx = W / 2 - pt.x, dy = H / 2 - pt.y;
+  const d = Math.hypot(dx, dy);
+  cham._vx = (dx / d) * cham.speed;
+  cham._vy = (dy / d) * cham.speed;
+  cham.state = 'entering';
+  cham.alpha = 1;
+}
+
+// ─── Update ───────────────────────────────────────────────────────────────────
+
+function update(dt) {
+  // fade out dead clumps
+  for (const c of clumps) {
+    if (!c.alive && c.opacity > 0) {
+      c.opacity -= dt * 2.5;
+      if (c.opacity < 0) c.opacity = 0;
+    }
+  }
+
+  // particles
+  for (const p of particles) {
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.08; p.life -= dt * 1.8;
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  // tongue
+  if (tongue.active) {
+    if (tongue.phase === 'extend') {
+      tongue.progress += dt * 4;
+      if (tongue.progress >= 1) {
+        tongue.progress = 1;
+        if (cham.target) {
+          cham.target.alive = false;
+          spawnParticles(cham.target.x, cham.target.y);
+        }
+        tongue.phase = 'retract';
+      }
+    } else {
+      tongue.progress -= dt * 3;
+      if (tongue.progress <= 0) {
+        tongue.progress = 0;
+        tongue.active = false;
+        cham.state = 'seeking';
+        cham.target = null;
+      }
+    }
+  }
+
+  // walk phase
+  if (cham.state === 'entering' || cham.state === 'seeking' || cham.state === 'exiting') {
+    cham.walkPhase += dt * 8;
+  }
+
+  // chameleon state machine
+  switch (cham.state) {
+    case 'idle': {
+      chamSpawnDelay -= dt;
+      if (chamSpawnDelay <= 0 && getAliveClumps().length > 0) {
+        spawnChameleon();
+        chamSpawnDelay = 1.5 + Math.random() * 1.5;
+      }
+      break;
+    }
+    case 'entering': {
+      cham.x += cham._vx * 60 * dt;
+      cham.y += cham._vy * 60 * dt;
+      if (cham.x > 80 && cham.x < W - 80 && cham.y > 80 && cham.y < H - 80) {
+        cham.state = 'seeking';
+      }
+      break;
+    }
+    case 'seeking': {
+      const t = getNearestClump();
+      if (!t) {
+        cham.state = 'exiting';
+        cham.exitPt = randomEdgePoint();
+        break;
+      }
+      cham.target = t;
+      const dx = t.x - cham.x, dy = t.y - cham.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 70) {
+        // set up tongue
+        const hx = cham.facing * 62;
+        const hy = -10;
+        tongue.dx = (t.x - (cham.x + hx));
+        tongue.dy = (t.y - (cham.y + hy));
+        tongue.active = true;
+        tongue.progress = 0;
+        tongue.phase = 'extend';
+        cham.state = 'licking';
+      } else {
+        cham.x += (dx / dist) * cham.speed * 60 * dt;
+        cham.y += (dy / dist) * cham.speed * 60 * dt;
+        cham.facing = dx > 0 ? 1 : -1;
+      }
+      break;
+    }
+    case 'licking':
+      break;
+    case 'exiting': {
+      const ep = cham.exitPt;
+      if (!ep) { cham.state = 'idle'; break; }
+      const dx = ep.x - cham.x, dy = ep.y - cham.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 10) { cham.state = 'idle'; chamSpawnDelay = 0.8; break; }
+      cham.x += (dx / dist) * cham.speed * 1.8 * 60 * dt;
+      cham.y += (dy / dist) * cham.speed * 1.8 * 60 * dt;
+      cham.facing = dx > 0 ? 1 : -1;
+      break;
+    }
+  }
+
+  // completion check
+  if (!gameComplete && clumps.length > 0 && clumps.every(c => c.opacity <= 0)) {
+    gameComplete = true;
+  }
+  if (gameComplete) {
+    completeAlpha = Math.min(1, completeAlpha + dt * 0.6);
+    if (completeAlpha >= 1) {
+      document.getElementById('restart').classList.add('visible');
+    }
+  }
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Soft warm background
+  ctx.fillStyle = '#f0ede8';
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw clumps
+  for (const c of clumps) {
+    if (c.opacity <= 0) continue;
+    ctx.save();
+    ctx.globalAlpha = c.opacity;
+    for (const el of c.elements) {
+      ctx.save();
+      ctx.translate(c.x + el.ox, c.y + el.oy);
+      ctx.rotate(el.rot);
+      DRAW_FNS[el.type](ctx, 0, 0, el.scale);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Particles
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+    ctx.restore();
+  }
+
+  // Tongue (behind chameleon head)
+  drawTongue(ctx, cham, tongue);
+
+  // Chameleon
+  if (cham.state !== 'idle') {
+    drawChameleon(ctx, cham.x, cham.y, cham.facing, cham.walkPhase, cham.alpha);
+  }
+
+  // Completion overlay
+  if (completeAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = completeAlpha * 0.55;
+    ctx.fillStyle = '#f0ede8';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = completeAlpha;
+    ctx.fillStyle = '#2d5a3d';
+    ctx.font = `bold ${Math.min(W * 0.06, 52)}px Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('All cleaned up!', W / 2, H / 2 - 30);
+    ctx.font = `${Math.min(W * 0.035, 28)}px Georgia, serif`;
+    ctx.fillStyle = '#5a8a4a';
+    ctx.fillText('The chameleon cleared every last clump.', W / 2, H / 2 + 20);
+    ctx.restore();
+  }
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+let last = 0;
+function loop(ts) {
+  const dt = Math.min((ts - last) / 1000, 0.05);
+  last = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+document.getElementById('restart').addEventListener('click', () => {
+  gameComplete = false;
+  completeAlpha = 0;
+  document.getElementById('restart').classList.remove('visible');
+  initClumps();
+  cham.state = 'idle';
+  chamSpawnDelay = 0.5;
+  particles = [];
+});
+
+initClumps();
+cham.state = 'idle';
+chamSpawnDelay = 0.3;
+requestAnimationFrame(ts => { last = ts; loop(ts); });
+</script>
+</body>
+</html>
