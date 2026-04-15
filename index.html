@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flower Bloom — Graduate Design Studio 2</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #efe6e4;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: sans-serif;
+    }
+
+    svg {
+      width: min(960px, 100vw);
+      height: auto;
+      display: block;
+    }
+
+    button {
+      margin-top: 24px;
+      background: #2d5a22;
+      color: #efe6e4;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 28px;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #37986d; }
+
+    /* Gentle sway after bloom */
+    @keyframes sway {
+      0%,100% { transform: rotate(0deg); }
+      25%      { transform: rotate(1.5deg); }
+      75%      { transform: rotate(-1.5deg); }
+    }
+    .swaying { animation: sway 4s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+
+<svg id="scene" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">
+  <!-- background -->
+  <rect width="960" height="540" fill="#efe6e4"/>
+
+  <!-- layer groups — z-order matters -->
+  <g id="layer-ground"/>
+  <g id="layer-stems"/>
+  <g id="layer-leaves"/>
+  <g id="layer-petals"/>
+  <g id="layer-centers"/>
+</svg>
+
+<button id="replay">replay</button>
+
+<script>
+'use strict';
+
+// ─── SVG helpers ────────────────────────────────────────────────────
+const NS  = 'http://www.w3.org/2000/svg';
+const $   = id => document.getElementById(id);
+
+function E(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) el.setAttribute(k, String(v));
+  return el;
+}
+
+// Makes transform-origin work like HTML (relative to element bounding box)
+function tx(el, origin = 'center center') {
+  el.style.transformBox    = 'fill-box';
+  el.style.transformOrigin = origin;
+  return el;
+}
+
+// ─── Easing ──────────────────────────────────────────────────────────
+const outCubic = t => 1 - (1 - t) ** 3;
+const outBack  = t => { const c = 1.70158 + 1; return 1 + c*(t-1)**3 + (c-1)*(t-1)**2; };
+const outQuart = t => 1 - (1 - t) ** 4;
+
+// ─── Tweener ─────────────────────────────────────────────────────────
+const timers = [];   // track all timeout ids so we can cancel on replay
+
+function tween({ duration, delay = 0, ease = outCubic, fn, done }) {
+  const id = setTimeout(() => {
+    const t0 = performance.now();
+    const frame = now => {
+      const t = Math.min((now - t0) / duration, 1);
+      fn(ease(t));
+      if (t < 1) requestAnimationFrame(frame);
+      else done?.();
+    };
+    requestAnimationFrame(frame);
+  }, delay);
+  timers.push(id);
+}
+
+// ─── Scene ───────────────────────────────────────────────────────────
+const GY = 508;   // ground baseline y in SVG coords
+
+const layers = {
+  ground  : $('layer-ground'),
+  stems   : $('layer-stems'),
+  leaves  : $('layer-leaves'),
+  petals  : $('layer-petals'),
+  centers : $('layer-centers'),
+};
+
+function clearScene() {
+  timers.forEach(clearTimeout);
+  timers.length = 0;
+  for (const g of Object.values(layers)) g.innerHTML = '';
+  // remove sway classes
+  $('scene').querySelectorAll('.swaying').forEach(el => el.classList.remove('swaying'));
+}
+
+// ─── Ground ──────────────────────────────────────────────────────────
+function buildGround() {
+  const g = E('ellipse', { cx:480, cy:GY+22, rx:510, ry:34, fill:'#399174' });
+  tx(g, 'center bottom');
+  g.style.transform = 'scaleY(0)';
+  layers.ground.appendChild(g);
+  tween({ duration:700, ease:outQuart, fn: t => { g.style.transform = `scaleY(${t})`; } });
+}
+
+// ─── Stem ────────────────────────────────────────────────────────────
+function buildStem(x, stemH, color, delay, group) {
+  const s = E('rect', { x:x-7, y:GY-stemH, width:14, height:stemH, rx:7, fill:color });
+  tx(s, 'center bottom');
+  s.style.transform = 'scaleY(0)';
+  layers.stems.appendChild(s);
+  tween({ duration:850, delay, ease:outQuart, fn: t => { s.style.transform = `scaleY(${t})`; } });
+
+  // Dot accents along vine stem
+  const dotCount = Math.round(stemH / 36);
+  for (let i = 0; i < dotCount; i++) {
+    const side = i % 2 === 0 ? 11 : -11;
+    const d = E('circle', {
+      cx: x + side,
+      cy: GY - 28 - i * 36,
+      r: 4.5,
+      fill: '#1a2e14'
+    });
+    tx(d);
+    d.style.transform = 'scale(0)';
+    layers.stems.appendChild(d);
+    tween({ duration:260, delay: delay + 680 + i*90, ease:outBack,
+      fn: t => { d.style.transform = `scale(${t})`; }
+    });
+  }
+
+  return s; // return stem rect so caller can add sway
+}
+
+// ─── Leaf ────────────────────────────────────────────────────────────
+function buildLeaf(x, y, rot, color, delay) {
+  const l = E('ellipse', { cx:x, cy:y, rx:26, ry:11, fill:color });
+  tx(l);
+  l.style.transform = `scale(0) rotate(${rot}deg)`;
+  layers.leaves.appendChild(l);
+  tween({ duration:460, delay, ease:outBack,
+    fn: t => { l.style.transform = `scale(${t}) rotate(${rot}deg)`; }
+  });
+}
+
+// ─── Petals ──────────────────────────────────────────────────────────
+
+// Tulip: 3 bold rounded petal shapes forming a cup (matching the reference style)
+function buildTulip(x, top, petalRx, petalRy, colorA, colorB, delay) {
+  // Back two outer petals first (rendered behind center)
+  const back = [
+    { dx:-petalRx*0.8, dy:petalRy*0.18, rot:-42, color:colorB },
+    { dx: petalRx*0.8, dy:petalRy*0.18, rot: 42, color:colorB },
+  ];
+  // Front center petal on top
+  const front = [
+    { dx:0, dy:-petalRy*0.08, rot:0, color:colorA },
+  ];
+
+  [...back, ...front].forEach((cfg, i) => {
+    const p = E('ellipse', {
+      cx: x + cfg.dx,
+      cy: top + cfg.dy,
+      rx: petalRx, ry: petalRy,
+      fill: cfg.color
+    });
+    tx(p);
+    p.style.transform = `scale(0) rotate(${cfg.rot}deg)`;
+    layers.petals.appendChild(p);
+    tween({ duration:620, delay: delay + i*80, ease:outBack,
+      fn: t => { p.style.transform = `scale(${t}) rotate(${cfg.rot}deg)`; }
+    });
+  });
+}
+
+// Daisy / poppy: petals radiate from center
+function buildRadial(x, top, petalRx, petalRy, n, D, color, delay) {
+  for (let i = 0; i < n; i++) {
+    const ang = (360 / n) * i - 90;   // start at top
+    const rad = ang * Math.PI / 180;
+    const p = E('ellipse', {
+      cx: x + D * Math.cos(rad),
+      cy: top + D * Math.sin(rad),
+      rx: petalRx, ry: petalRy,
+      fill: color
+    });
+    tx(p);
+    const rot = ang + 90;              // orient petal outward
+    p.style.transform = `scale(0) rotate(${rot}deg)`;
+    layers.petals.appendChild(p);
+    tween({ duration:560, delay: delay + i*60, ease:outBack,
+      fn: t => { p.style.transform = `scale(${t}) rotate(${rot}deg)`; }
+    });
+  }
+}
+
+// ─── Center dot ─────────────────────────────────────────────────────
+function buildCenter(x, top, r, color, delay) {
+  const c = E('circle', { cx:x, cy:top, r, fill:color });
+  tx(c);
+  c.style.transform = 'scale(0)';
+  layers.centers.appendChild(c);
+  tween({ duration:360, delay, ease:outBack,
+    fn: t => { c.style.transform = `scale(${t})`; }
+  });
+}
+
+// Poppy pollen ring
+function buildPollenRing(x, top, ringR, dotColor, delay) {
+  for (let i = 0; i < 9; i++) {
+    const a = (360/9)*i * Math.PI/180;
+    const d = E('circle', { cx: x+ringR*Math.cos(a), cy: top+ringR*Math.sin(a), r:2.5, fill:dotColor });
+    tx(d);
+    d.style.transform = 'scale(0)';
+    layers.centers.appendChild(d);
+    tween({ duration:250, delay: delay+i*28, ease:outBack,
+      fn: t => { d.style.transform = `scale(${t})`; }
+    });
+  }
+}
+
+// ─── Blue leaf accent plants ─────────────────────────────────────────
+function buildBlueLeafPlant(x, delay) {
+  const stemH = 105;
+  const s = E('rect', { x:x-4, y:GY-stemH, width:8, height:stemH, rx:4, fill:'#d1d83b' });
+  tx(s, 'center bottom');
+  s.style.transform = 'scaleY(0)';
+  layers.stems.appendChild(s);
+  tween({ duration:550, delay, ease:outQuart, fn: t => { s.style.transform = `scaleY(${t})`; } });
+
+  for (let i = 0; i < 4; i++) {
+    const side = i%2===0 ? -1 : 1;
+    const l = E('ellipse', {
+      cx: x + side*20, cy: GY - 22 - i*24,
+      rx: 15, ry: 7, fill:'#0365b9'
+    });
+    tx(l);
+    l.style.transform = `scale(0) rotate(${side*28}deg)`;
+    layers.leaves.appendChild(l);
+    tween({ duration:320, delay: delay+150+i*100, ease:outBack,
+      fn: t => { l.style.transform = `scale(${t}) rotate(${side*28}deg)`; }
+    });
+  }
+}
+
+// ─── Build the full scene ─────────────────────────────────────────────
+function buildScene() {
+  clearScene();
+  buildGround();
+
+  // ── Flower 1: Yellow daisy — far left ──────────────
+  {
+    const x=185, sH=148, d=280;
+    buildStem(x, sH, '#d1d83b', d);
+    buildLeaf(x-30, GY-sH*0.52,  -38, '#2d5a22', d+540);
+    buildLeaf(x+28, GY-sH*0.34,   32, '#2d5a22', d+660);
+    const top = GY-sH;
+    buildRadial(x, top, 13, 30, 6, 28, '#f0c04a', d+950);
+    buildCenter(x, top, 11, '#e87a2a', d+950+6*60+80);
+  }
+
+  // ── Flower 2: Small pink tulip — left-center ───────
+  {
+    const x=335, sH=128, d=1000;
+    buildStem(x, sH, '#d1d83b', d);
+    buildLeaf(x-28, GY-sH*0.55,  -35, '#2d5a22', d+540);
+    buildLeaf(x+26, GY-sH*0.36,   30, '#2d5a22', d+660);
+    const top = GY-sH;
+    buildTulip(x, top, 14, 34, '#f4a4c0', '#ee95b8', d+950);
+    buildCenter(x, top, 7, '#2d5a22', d+950+3*80+200);
+  }
+
+  // ── Blue leaf accents — between flowers ────────────
+  buildBlueLeafPlant(420, 1700);
+  buildBlueLeafPlant(560, 2200);
+
+  // ── Flower 3: Tall pink tulip — center ─────────────
+  {
+    const x=480, sH=205, d=1750;
+    buildStem(x, sH, '#d1d83b', d);
+    buildLeaf(x-32, GY-sH*0.50,  -38, '#2d5a22', d+580);
+    buildLeaf(x+30, GY-sH*0.34,   33, '#2d5a22', d+700);
+    const top = GY-sH;
+    buildTulip(x, top, 18, 44, '#f4a4c0', '#ee95b8', d+1000);
+    buildCenter(x, top, 9, '#2d5a22', d+1000+3*80+200);
+  }
+
+  // ── Flower 4: Red poppy — right-center ─────────────
+  {
+    const x=635, sH=162, d=2800;
+    buildStem(x, sH, '#399174', d);
+    buildLeaf(x-30, GY-sH*0.50,  -35, '#476741', d+560);
+    buildLeaf(x+28, GY-sH*0.33,   30, '#476741', d+680);
+    const top = GY-sH;
+    buildRadial(x, top, 21, 37, 5, 27, '#ff6f6f', d+1000);
+    buildPollenRing(x, top, 10, '#f0c04a', d+1000+5*60+120);
+    buildCenter(x, top, 13, '#1a2214', d+1000+5*60+200);
+  }
+
+  // ── Flower 5: Small yellow — far right ─────────────
+  {
+    const x=780, sH=118, d=3700;
+    buildStem(x, sH, '#d1d83b', d);
+    buildLeaf(x-28, GY-sH*0.52,  -36, '#2d5a22', d+530);
+    buildLeaf(x+26, GY-sH*0.35,   30, '#2d5a22', d+650);
+    const top = GY-sH;
+    buildRadial(x, top, 11, 24, 5, 22, '#f0c04a', d+920);
+    buildCenter(x, top, 8, '#e87a2a', d+920+5*60+80);
+  }
+
+  // Add gentle sway to all flower stems after everything blooms
+  setTimeout(() => {
+    layers.stems.querySelectorAll('rect').forEach((s, i) => {
+      s.style.transformBox    = 'fill-box';
+      s.style.transformOrigin = 'center bottom';
+      s.style.animationDelay  = `${i * 0.4}s`;
+      s.classList.add('swaying');
+    });
+  }, 5800);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────
+buildScene();
+$('replay').addEventListener('click', buildScene);
+</script>
+</body>
+</html>
